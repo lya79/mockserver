@@ -8,7 +8,7 @@
 	private Resource jsonFile;
 ```
 
-3.啟動程式測試
+3. 啟動程式測試
 `rule.json`裡面已經有先寫一條 API可以做測試.
 
 # 設定配置
