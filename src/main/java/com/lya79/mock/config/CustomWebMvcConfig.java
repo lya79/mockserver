@@ -1,4 +1,4 @@
-package com.lya79.mock;
+package com.lya79.mock.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;

@@ -1,4 +1,4 @@
-package com.lya79.mock;
+package com.lya79.mock.util;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -26,8 +26,6 @@ public class MatcherUtil {
 	@Value("file:C:\\Users\\USER\\Desktop\\springboot\\workspace\\rule.json")
 	private Resource jsonFile;
 	
-	private final static boolean FLAG_DEBUG = true;
-
 	public boolean handler(HttpServletRequest request, HttpServletResponse response) throws IOException {
 		String reqURLStr = (String) request.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
 		String reqMethod = request.getMethod();
@@ -48,7 +46,6 @@ public class MatcherUtil {
 					}
 
 					// 檢查 method
-					System.out.println("檢查 method");
 					JsonNode methodNode = requestNode.path("method");
 					if (methodNode.isMissingNode()) {
 						continue;
@@ -59,7 +56,6 @@ public class MatcherUtil {
 					}
 
 					// 檢查 URL
-					System.out.println("檢查 URL");
 					JsonNode urlNode = requestNode.path("url");
 					if (urlNode.isMissingNode()) {
 						continue;
@@ -72,7 +68,6 @@ public class MatcherUtil {
 					}
 
 					// 檢查 header
-					System.out.println("檢查 header");
 					boolean allHeaderMatch = true;
 					JsonNode headerNode = requestNode.path("header");
 					if (!headerNode.isMissingNode()) {
@@ -87,8 +82,6 @@ public class MatcherUtil {
 							while (iterator2.hasMoreElements()) {
 								String reqHeader = iterator2.nextElement();
 								String reqHeaderValue = request.getHeader(reqHeader);
-
-								System.out.println("header: " + reqHeader + " -> " + reqHeaderValue);
 
 								if (headerName.trim().equals(reqHeader.trim())
 										&& headerValue.trim().equals(reqHeaderValue.trim())) {
@@ -108,7 +101,6 @@ public class MatcherUtil {
 					}
 
 					// 檢查 URL參數
-					System.out.println("檢查 URL參數");
 					boolean allURLParameterMatch = true;
 					JsonNode urlParameterNode = requestNode.path("urlParameter");
 					if (!urlParameterNode.isMissingNode()) {
@@ -143,7 +135,6 @@ public class MatcherUtil {
 					}
 
 					// 檢查 applicationJson
-					System.out.println("檢查 applicationJson");
 					boolean allApplicationJsonMatch = true;
 					String applicationJson = request.getReader().lines().collect(Collectors.joining());
 					JsonNode reqApplicationJsonNode = new ObjectMapper().readTree(applicationJson);
@@ -180,10 +171,6 @@ public class MatcherUtil {
 						}
 					}
 
-					System.out.println("匹配成功");
-
-					System.out.println("檢查 延遲回應");
-
 					// 延遲回應
 					int delay = requestNode.path("delay").intValue(); // 使用指定的延遲回應時間
 					if (delay <= 0) { // 使用預設的延遲回應時間
@@ -191,7 +178,6 @@ public class MatcherUtil {
 					}
 
 					if (delay > 0) {
-						System.out.println("進行延遲: " + delay + "ms");
 						try {
 							Thread.sleep(delay);
 						} catch (InterruptedException ie) {
@@ -219,8 +205,6 @@ public class MatcherUtil {
 				}
 			}
 		}
-
-		System.out.println("匹配失敗");
 
 		JsonNode errorNode = rootNode.path("default").path("response").path("error");
 		if (!errorNode.isMissingNode()) { // 使用預設的失敗回應
