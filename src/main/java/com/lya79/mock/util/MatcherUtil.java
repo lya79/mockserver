@@ -13,8 +13,6 @@ import javax.servlet.RequestDispatcher;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,16 +20,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Component
 public class MatcherUtil {
-
-	@Value("file:C:\\Users\\USER\\Desktop\\springboot\\workspace\\rule.json")
-	private Resource jsonFile;
-	
-	public boolean handler(HttpServletRequest request, HttpServletResponse response) throws IOException {
+	public boolean handler(HttpServletRequest request, HttpServletResponse response, JsonNode rootNode)
+			throws IOException {
 		String reqURLStr = (String) request.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
 		String reqMethod = request.getMethod();
-
-		ObjectMapper mapper = new ObjectMapper();
-		JsonNode rootNode = mapper.readTree(jsonFile.getInputStream());
 
 		JsonNode testcaseNode = rootNode.path("testCase");
 		if (!testcaseNode.isMissingNode() && testcaseNode.isArray()) {

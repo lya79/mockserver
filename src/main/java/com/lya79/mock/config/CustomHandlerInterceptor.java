@@ -4,11 +4,15 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lya79.mock.util.MatcherUtil;
 
 @Component
@@ -17,11 +21,17 @@ public class CustomHandlerInterceptor implements HandlerInterceptor {
 	@Autowired
 	MatcherUtil requestMatcher;
 
+	@Value("file:C:\\Users\\USER\\Desktop\\springboot\\workspace\\rule.json")
+	private Resource jsonFile;
+
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
 			throws Exception {
 		// Controller前執行
-		boolean match = requestMatcher.handler(request, response);
+
+		JsonNode rootNode = new ObjectMapper().readTree(jsonFile.getInputStream());
+
+		boolean match = requestMatcher.handler(request, response, rootNode);
 		if (match) {
 			return false; // 停止後續處理
 		}
