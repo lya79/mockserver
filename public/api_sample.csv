@@ -1,0 +1,25 @@
+﻿request,,
+method,get,
+url,hello,
+header,content-type,application/json; charset=utf-8
+delay,500,
+response,,
+status,200,
+header,content-type,application/json; charset=utf-8
+body,"{""message"": ""hello world""}",
+,,
+request,,
+method,post,
+url,^/fruit/[a-zA-Z]{2}[0-9]{4}$,
+header,content-type,application/json; charset=utf-8
+header,color,red
+urlParameter,id,[a-zA-Z0-9]{6}
+urlParameter,name,"[a-zA-Z0-9]{5,12}"
+applicationJson,color,"[a-zA-Z]{3,12}"
+applicationJson,color,"[0-9]{1,10}"
+delay,500,
+response,,
+status,200,
+header,content-type,application/json; charset=utf-8
+header,helloheader,hello header
+body,"{""name"": ""apple"",""color"": ""red""}",

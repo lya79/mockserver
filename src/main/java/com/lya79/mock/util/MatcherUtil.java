@@ -25,6 +25,8 @@ public class MatcherUtil {
 		String reqURLStr = (String) request.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
 		String reqMethod = request.getMethod();
 
+		String rootPathStr = rootNode.path("default").path("rootPath").asText();
+
 		JsonNode testcaseNode = rootNode.path("testCase");
 		if (!testcaseNode.isMissingNode() && testcaseNode.isArray()) {
 			Iterator<JsonNode> testcaseNodeIterator = testcaseNode.elements();
@@ -47,6 +49,21 @@ public class MatcherUtil {
 						continue;
 					}
 
+					// 檢查 root path
+					reqURLStr = reqURLStr.trim();
+					if (!rootPathStr.isBlank()) {
+						if (!reqURLStr.startsWith(rootPathStr)) {
+							continue;
+						}
+
+						String[] arr = reqURLStr.split(rootPathStr);
+						if (arr.length != 2) {
+							continue;
+						}
+
+						reqURLStr = arr[1];
+					}
+
 					// 檢查 URL
 					JsonNode urlNode = requestNode.path("url");
 					if (urlNode.isMissingNode()) {
@@ -54,7 +71,7 @@ public class MatcherUtil {
 					}
 					String urlStr = urlNode.asText();
 					Pattern pattern = Pattern.compile(urlStr.trim());
-					Matcher matcher = pattern.matcher(reqURLStr.trim());
+					Matcher matcher = pattern.matcher(reqURLStr);
 					if (!matcher.matches()) {
 						continue;
 					}
