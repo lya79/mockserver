@@ -1,21 +1,16 @@
 package com.lya79.mock.config;
 
-import java.io.File;
-import java.io.InputStream;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lya79.mock.util.CsvUtil;
 import com.lya79.mock.util.MatcherUtil;
 
 @Component
@@ -26,20 +21,29 @@ public class CustomHandlerInterceptor implements HandlerInterceptor {
 	@Autowired
 	private MatcherUtil requestMatcher;
 
+	@Autowired
+	private CsvUtil csvUtil;
+
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
 			throws Exception {
 		// Controller前執行
 
+		boolean enableCsvAPI = true;
+		if (enableCsvAPI) {
+			String path = "C:/Users/USER/Desktop/springboot/workspace/mock/public/api_sample.csv";
+			boolean match = csvUtil.handler(request, response, path);
+			if (match) {
+				return false; // 停止後續處理
+			}
+		}
+
 		if (enableResourcesAPI) {
-			String path = "static" + File.separator + "rule.json";
-			ClassPathResource classPathResource = new ClassPathResource(path);
-			InputStream inputStream = classPathResource.getInputStream();
-
-			JsonNode rootNode = new ObjectMapper().readTree(inputStream);
-
-			requestMatcher.handler(request, response, rootNode);
-			return false; // 停止後續處理
+			String path = "static/rule.json";
+			boolean match = requestMatcher.handler(request, response, path);
+			if (match) {
+				return false; // 停止後續處理
+			}
 		}
 
 		return true; // 通過攔截器

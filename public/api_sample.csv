@@ -1,25 +1,18 @@
-﻿request,,
-method,get,
-url,hello,
-header,content-type,application/json; charset=utf-8
-delay,500,
-response,,
-status,200,
-header,content-type,application/json; charset=utf-8
-body,"{""message"": ""hello world""}",
-,,
-request,,
-method,post,
-url,^/fruit/[a-zA-Z]{2}[0-9]{4}$,
-header,content-type,application/json; charset=utf-8
-header,color,red
-urlParameter,id,[a-zA-Z0-9]{6}
-urlParameter,name,"[a-zA-Z0-9]{5,12}"
-applicationJson,color,"[a-zA-Z]{3,12}"
-applicationJson,color,"[0-9]{1,10}"
-delay,500,
-response,,
-status,200,
-header,content-type,application/json; charset=utf-8
-header,helloheader,hello header
-body,"{""name"": ""apple"",""color"": ""red""}",
+type,method,url,status,header,parameter,content,delay
+request,post,^/fruit/[a-zA-Z]{2}[0-9]{4}$,,"content-type=application/json; charset=utf-8
+color=red","id=[a-zA-Z0-9]{6}
+name[a-zA-Z0-9]{5,12}","{
+  ""name"": ""[a-zA-Z0-9]{5,12}"",
+  ""color"": ""red"",
+  ""detail"": {
+    ""size"": ""small"",
+    ""!price"": [
+      [a-zA-Z0-9]{6},
+      [a-zA-Z0-9]{6}
+    ]
+  }
+}",500
+response,,,200,"content-type=application/json; charset=utf-8
+helloheader=hello header",,"{""name"": ""apple"",""color"": ""red""}",
+request,get,hello/world/,,,,,1000
+response,,,200,content-type=application/json; charset=utf-8,,"{""message"": ""hello world""}",

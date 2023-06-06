@@ -1,6 +1,7 @@
 package com.lya79.mock.util;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.util.Enumeration;
 import java.util.Iterator;
@@ -13,6 +14,7 @@ import javax.servlet.RequestDispatcher;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -20,8 +22,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Component
 public class MatcherUtil {
-	public boolean handler(HttpServletRequest request, HttpServletResponse response, JsonNode rootNode)
-			throws IOException {
+	public boolean handler(HttpServletRequest request, HttpServletResponse response, String path) throws IOException {
+		ClassPathResource classPathResource = new ClassPathResource(path);
+		InputStream inputStream = classPathResource.getInputStream();
+
+		JsonNode rootNode = new ObjectMapper().readTree(inputStream);
+
 		String reqURLStr = (String) request.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
 		String reqMethod = request.getMethod();
 
@@ -215,15 +221,14 @@ public class MatcherUtil {
 			}
 		}
 
+		// 沒有匹配任何請求時, 會去檢查預設的失敗回應
 		JsonNode errorNode = rootNode.path("default").path("response").path("error");
 		if (!errorNode.isMissingNode()) { // 使用預設的失敗回應
 			setResponse(response, errorNode);
 			return true;
 		}
 
-		response.setStatus(404); // 假如沒有預設的失敗回應就一律回傳 404
-
-		return true;
+		return false; // 沒有匹配任何請求
 	}
 
 	private void setResponse(HttpServletResponse response, JsonNode responseNode) throws IOException {
