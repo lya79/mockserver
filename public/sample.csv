@@ -1,0 +1,18 @@
+type,method,url,status,header,parameter,body,delay
+request,post,^/fruit/[a-zA-Z]{2}[0-9]{4}/$,,"content-type=application/json; charset=utf-8
+color=red","id=[a-zA-Z0-9]{6}
+name=[a-zA-Z0-9]{5,12}","{
+  ""name"": ""[a-zA-Z0-9]{5,12}"",
+  ""color"": ""red"",
+  ""detail"": {
+    ""size"": ""small"",
+    ""price"": [
+      10,
+      20
+    ]
+  }
+}",0
+response,,,200,"content-type=application/json; charset=utf-8
+helloheader=hello header",,"{""name"": ""apple"",""color"": ""red""}",
+request,get,/hello/world/,,,,,500
+response,,,200,content-type=text/plain; charset=utf-8,,hello world,

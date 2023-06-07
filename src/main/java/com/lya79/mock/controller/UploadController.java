@@ -27,10 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Controller
 //@Slf4j
 public class UploadController {
-
-//	@Value("${file.upload.path}")
-//	private String path;
-
+	
 	@Value("${file.upload.url}")
 	private String uploadFilePath;
 
@@ -42,23 +39,6 @@ public class UploadController {
 	@PostMapping("/upload")
 	@ResponseBody
 	public String upload(@RequestPart MultipartFile[] files) throws IOException {
-//		StringBuffer message = new StringBuffer();
-//
-//		for (MultipartFile file : files) {
-//			String fileName = file.getOriginalFilename();
-//			String filePath = path + fileName;
-//			System.out.println("dest path:" + filePath);
-//
-//			InputStream is = file.getInputStream();
-//			File dest = new File(filePath);
-//			Files.copy(is, dest.toPath());
-//			is.close();
-//
-//			message.append("Upload file success : " + dest.getAbsolutePath()).append("<br>");
-//		}
-//		
-//		return message.toString();
-
 		for (int i = 0; i < files.length; i++) {
 			String fileName = files[i].getOriginalFilename();
 			File dest = new File(uploadFilePath + '/' + fileName);
@@ -78,16 +58,6 @@ public class UploadController {
 	@ResponseBody
 	@RequestMapping(value = { "/list" }, method = { RequestMethod.GET }, produces = "application/json;charset=UTF-8")
 	public String list(HttpServletResponse response) { // 註冊新帳號
-		// url ex: http://localhost:8080/list
-		// output:
-//		    [ {
-//			  "filename" : "hello2.png",
-//			  "lastModified" : "Mon Jun 05 14:25:39 CST 2023"
-//			}, {
-//			  "filename" : "Untitled-1.txt",
-//			  "lastModified" : "Mon Jun 05 14:53:58 CST 2023"
-//			} ]
-
 		HashMap<String, String> map = new HashMap<>();
 
 		File dir = new File(uploadFilePath);
@@ -119,8 +89,6 @@ public class UploadController {
 
 	@RequestMapping("/download")
 	public String download(HttpServletResponse response, @RequestParam("filename") String fileName) {
-		// url ex: http://localhost:8080/download?filename=vvvvv.txt
-
 		File file = new File(uploadFilePath + '/' + fileName);
 		if (!file.exists()) {
 			return "下载文件不存在";

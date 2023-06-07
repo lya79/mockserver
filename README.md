@@ -1,66 +1,24 @@
-# 使用方式
+# 介紹
 
-1. 先修改 `resources/static/rule.json`內的 API
-2. 啟動程式測試
+藉由 csv檔案內的設定可以動態產生 api, 達到預先設定請求格式和回傳內容, 不需要修改程式碼, 並且提供 API可以更新 csv檔案.
 
-# 設定配置
-* API都設定在 `rule.json`即可, 下面提供一個範例.
-* `testCase`、`request`、`method`、`url`這4種設定都是必要設定, 其他設定都是選項可刪除.
-* `rootPath`只能在`default`內使用.
-* `status`一律使用數值型態.
-* `method`、`header`、`body`直接給值不能使用正規表示法.
-* `url`、`urlParameter的內部參數`、`urlParameter的內部參數`一律都使用正規表示法.
+# 使用方法
+直接啟動程式即可.
+> 備註: 參考 `public/sample.csv`內預先設定的範本 API來發送請求.
 
-```json
-{
-  "default":{ // 通用設定(可以移除)
-    "rootPath": "/v1", // 設定 URL前綴
-    "delay": 3000, // 全部 API回應都等待多少時間(單位:ms)
-    "response":{ 
-      "success":{ // API匹配成功回應的內容
-        "status": 201,
-        "header":{
-          "content-type":"application/json; charset=utf-8"
-        },
-        "body": "\"message\": \"hello mock server\""
-      },
-      "error":{ // API匹配失敗回應的內容
-        "status": 405,
-        "header":{
-          "content-type":"application/json; charset=utf-8"
-        },
-        "body": "\"message\": \"Not Found!\""
-      }
-    }
-  },
-  "testCase": [ // API個別設定
-    {
-      "request": {  // 請求條件
-        "method": "POST", 
-        "url": "^/fruit/[a-zA-Z]{2}[0-9]{4}$",
-        "header":{ // header設定
-          "content-type":"application/json; charset=utf-8",
-          "color":"red" 
-        },
-        "urlParameter": { // URL帶的參數
-          "id": "[a-zA-Z0-9]{6}", 
-          "name": "[a-zA-Z0-9]{5,12}"
-        },
-        "applicationJson": { // application Json參數
-          "color": "[a-zA-Z]{3,12}",
-          "price": "[0-9]{1,10}"
-        },
-        "delay": 500 //  API回應等待多少時間(單位:ms)
-      },
-      "response": {
-        "status": 200,
-        "header":{
-            "content-type": "application/json; charset=utf-8",
-            "helloheader":"hello header"
-        },
-        "body": "\"name\": \"apple\",\"color\": \"red\""
-      }
-    }
-  ]
-}
-```
+# 更新 csv檔案
+* 方法1: 直接將 csv檔案放置到 public目錄.
+* 方法2: 透過網頁打開 localhost:8080可以開啟上傳 csv檔案的畫面.
+
+# csv檔案設定
+* csv檔案都存放在 public目錄. 
+* 使用 csv格式儲存設定 api.
+* 可以有多份 csv檔案
+
+# 備註
+
+ `GET /list`這個 API可以查詢目前有哪些 csv檔案
+> 例如: http://localhost:8080/list
+
+ `GET /download`這個 API可以下載指定 csv檔案
+> 例如:  http://localhost:8080/download?filename=sample.csv
