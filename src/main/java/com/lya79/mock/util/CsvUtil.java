@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.servlet.RequestDispatcher;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -27,7 +28,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Component
 public class CsvUtil {
 	public boolean handler(HttpServletRequest request, HttpServletResponse response, String path) {
-		String[] csvHeader = new String[] { "type", "method", "url", "status", "header", "parameter", "body", "delay" };
+		String[] csvHeader = new String[] { "type", "delay", "method", "url", "status", "header", "parameter", "body",
+				"cookie", "cookie-expires" };
 
 		CSVParser csvParser;
 
@@ -44,13 +46,15 @@ public class CsvUtil {
 		try {
 			for (CSVRecord csvRecord : csvParser) {
 				String reqStr = csvRecord.get(csvHeader[0]);
-				String methodStr = csvRecord.get(csvHeader[1]);
-				String urlStr = csvRecord.get(csvHeader[2]);
-				String statusStr = csvRecord.get(csvHeader[3]);
-				String headerStr = csvRecord.get(csvHeader[4]);
-				String parameterStr = csvRecord.get(csvHeader[5]);
-				String bodyStr = csvRecord.get(csvHeader[6]);
-				String delayStr = csvRecord.get(csvHeader[7]);
+				String delayStr = csvRecord.get(csvHeader[1]);
+				String methodStr = csvRecord.get(csvHeader[2]);
+				String urlStr = csvRecord.get(csvHeader[3]);
+				String statusStr = csvRecord.get(csvHeader[4]);
+				String headerStr = csvRecord.get(csvHeader[5]);
+				String parameterStr = csvRecord.get(csvHeader[6]);
+				String bodyStr = csvRecord.get(csvHeader[7]);
+				String cookieStr = csvRecord.get(csvHeader[8]);
+				String cookieExpiresStr = csvRecord.get(csvHeader[9]);
 
 				// 處理請求
 				if (reqStr.equalsIgnoreCase("request")) {
@@ -61,6 +65,7 @@ public class CsvUtil {
 							|| !isMatchHeader(request, headerStr) // 檢查 header
 							|| !isMatchUrlParameter(request, parameterStr) // 檢查 url參數
 							|| !isMatchBody(request, bodyStr) // 檢查 content
+							|| !isMatchCookie(request, cookieStr) // 檢查 cookie
 					) {
 						continue;
 					}
@@ -79,11 +84,14 @@ public class CsvUtil {
 					setStatus(response, statusStr);
 					setHeader(response, headerStr);
 					setBody(response, bodyStr);
+					setCookie(response, cookieStr, cookieExpiresStr);
 
 					return true; // 請求匹配成功
 				}
 			}
-		} catch (Exception e) {
+		} catch (
+
+		Exception e) {
 			System.err.println("csv設定檔案錯誤: " + e.toString());
 			return false;
 		} finally {
@@ -103,6 +111,10 @@ public class CsvUtil {
 	}
 
 	private void setHeader(HttpServletResponse response, String text) throws Exception {
+		if (text == null || text.trim().equals("")) {
+			return;
+		}
+
 		String[] arr = text.split("\n");
 		for (int i = 0; i < arr.length; i++) {
 			String[] arr2 = arr[i].split("=", 2);
@@ -117,8 +129,47 @@ public class CsvUtil {
 	}
 
 	private void setBody(HttpServletResponse response, String text) throws IOException {
+		if (text == null || text.trim().equals("")) {
+			return;
+		}
+
 		PrintWriter printWriter = response.getWriter();
 		printWriter.append(text);
+	}
+
+	private void setCookie(HttpServletResponse response, String text, String cookieExpiresStr) throws Exception {
+		if (text == null || text.trim().equals("")) {
+			return;
+		}
+
+		Integer expires = -1; // 沒設定有效時間一律設定成 -1
+
+		if (cookieExpiresStr != null && !cookieExpiresStr.trim().equals("")) {
+			expires = Integer.parseInt(cookieExpiresStr);
+		}
+
+		String[] arr = text.split("\n");
+		for (int i = 0; i < arr.length; i++) {
+			String[] arr2 = arr[i].split("=", 2);
+			if (arr2.length != 2) {
+				throw new Exception("檢查cookie, 參數錯誤: " + text);
+			}
+
+			String key = arr2[0];
+			String value = arr2[1];
+			Cookie cookie = new Cookie(key, value);
+
+			if (expires != null) {
+				cookie.setMaxAge(expires);
+			}
+
+			// XXX 暫時用不到
+//			cookie.setHttpOnly(false);
+//			cookie.setDomain(text);
+//			cookie.setPath(text);
+
+			response.addCookie(cookie);
+		}
 	}
 
 	private boolean isMatchMethod(HttpServletRequest request, String text) throws Exception {
@@ -241,6 +292,53 @@ public class CsvUtil {
 		JsonNode bodyNode = mapper.readTree(text);
 
 		return bodyNode.equals(reqApplicationJsonNode);
+	}
+
+	private boolean isMatchCookie(HttpServletRequest request, String text) throws Exception {
+		if (text == null || text.trim().equals("")) {
+			return true;
+		}
+
+		Map<String, String> map = new HashMap<>();
+		String[] arr = text.split("\n");
+		for (int i = 0; i < arr.length; i++) {
+			String[] arr2 = arr[i].split("=", 2);
+			if (arr2.length != 2) {
+				throw new Exception("檢查cookie, 參數錯誤: " + text);
+			}
+
+			String key = arr2[0];
+			String value = arr2[1];
+			map.put(key, value);
+		}
+
+		for (Map.Entry<String, String> entry : map.entrySet()) {
+			String name = entry.getKey();
+			String value = entry.getValue();
+
+			boolean match = false;
+
+			javax.servlet.http.Cookie[] reqCookieArr = request.getCookies();
+			if (reqCookieArr == null) {
+				return false;
+			}
+
+			for (javax.servlet.http.Cookie reqCookie : reqCookieArr) {
+				String reqName = reqCookie.getName();
+				String reqValue = reqCookie.getValue();
+
+				if (name.trim().equals(reqName.trim()) && value.trim().equals(reqValue.trim())) {
+					match = true;
+					break;
+				}
+			}
+
+			if (!match) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private void delay(String text) throws NumberFormatException {

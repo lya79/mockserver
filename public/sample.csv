@@ -1,5 +1,5 @@
-type,method,url,status,header,parameter,body,delay
-request,post,^/fruit/[a-zA-Z]{2}[0-9]{4}/$,,"content-type=application/json; charset=utf-8
+type,delay,method,url,status,header,parameter,body,cookie,cookie-expires
+request,0,post,^/fruit/[a-zA-Z]{2}[0-9]{4}/$,,"content-type=application/json; charset=utf-8
 color=red","id=[a-zA-Z0-9]{6}
 name=[a-zA-Z0-9]{5,12}","{
   ""name"": ""[a-zA-Z0-9]{5,12}"",
@@ -11,8 +11,11 @@ name=[a-zA-Z0-9]{5,12}","{
       20
     ]
   }
-}",0
-response,,,200,"content-type=application/json; charset=utf-8
-helloheader=hello header",,"{""name"": ""apple"",""color"": ""red""}",
-request,get,/hello/world/,,,,,500
-response,,,200,content-type=text/plain; charset=utf-8,,hello world,
+}","session=session1
+hello=sesson2",
+response,,,,200,"content-type=application/json; charset=utf-8
+helloheader=hello header",,"{""name"": ""apple"",""color"": ""red""}","session=session1
+hello=sesson2
+newcookie=hello",60
+request,500,get,/hello/world/,,,,,,
+response,,,,200,content-type=text/plain; charset=utf-8,,hello world,,
