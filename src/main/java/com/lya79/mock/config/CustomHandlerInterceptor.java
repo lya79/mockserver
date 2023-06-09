@@ -13,7 +13,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
 import com.lya79.mock.util.CsvUtil;
-import com.lya79.mock.util.MySQLUtil;
+import com.lya79.mock.util.SqlUtil;
 
 @Component
 public class CustomHandlerInterceptor implements HandlerInterceptor {
@@ -30,7 +30,7 @@ public class CustomHandlerInterceptor implements HandlerInterceptor {
 	private CsvUtil csvUtil;
 
 	@Autowired
-	private MySQLUtil mysqlUtil;
+	private SqlUtil mysqlUtil;
 
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
