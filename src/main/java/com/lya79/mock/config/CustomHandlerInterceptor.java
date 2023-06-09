@@ -13,6 +13,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
 import com.lya79.mock.util.CsvUtil;
+import com.lya79.mock.util.MySQLUtil;
 
 @Component
 public class CustomHandlerInterceptor implements HandlerInterceptor {
@@ -28,6 +29,9 @@ public class CustomHandlerInterceptor implements HandlerInterceptor {
 	@Autowired
 	private CsvUtil csvUtil;
 
+	@Autowired
+	private MySQLUtil mysqlUtil;
+
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
 			throws Exception {
@@ -39,15 +43,23 @@ public class CustomHandlerInterceptor implements HandlerInterceptor {
 				File[] files = dir.listFiles();
 				for (int i = 0; i < files.length; i++) {
 					File file = files[i];
-					if (!isCsvFile(file)) {
+					if (!CsvUtil.isCsvFile(file)) {
 						continue;
 					}
-					String csvFilePath = file.getPath();
-					boolean match = csvUtil.handler(request, response, csvFilePath);
+					csvUtil.setPath(file.getPath());
+					boolean match = csvUtil.handler(request, response);
 					if (match) {
 						return false; // 停止後續處理
 					}
 				}
+			}
+		}
+
+		boolean enableMysqlAPI = true;
+		if (enableMysqlAPI) {// 啟用動態產生 restful的 mysql api
+			boolean match = mysqlUtil.handler(request, response);
+			if (match) {
+				return false; // 停止後續處理
 			}
 		}
 
@@ -64,15 +76,5 @@ public class CustomHandlerInterceptor implements HandlerInterceptor {
 	public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler,
 			@Nullable Exception ex) throws Exception {
 		// 整個請求及回應結束後執行
-	}
-
-	private boolean isCsvFile(File file) {
-		String filename = file.getName();
-		String extension = "";
-		int idx = filename.lastIndexOf(".");
-		if (idx >= 0) {
-			extension = filename.substring(idx + 1);
-		}
-		return extension.equals("csv");
 	}
 }

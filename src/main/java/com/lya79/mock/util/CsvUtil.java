@@ -1,12 +1,17 @@
 package com.lya79.mock.util;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,26 +30,66 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import lombok.Setter;
+
 @Component
-public class CsvUtil {
-	public boolean handler(HttpServletRequest request, HttpServletResponse response, String path) {
+public class CsvUtil implements IMockUtil {
+	@Setter
+	private String path;
+
+	private Date lastModified;
+	private List<CSVRecord> records = new ArrayList<CSVRecord>();
+
+	@Override
+	public boolean handler(HttpServletRequest request, HttpServletResponse response) {
 		String[] csvHeader = new String[] { "type", "delay", "method", "url", "status", "header", "parameter", "body",
 				"cookie", "cookie-expires" };
 
-		CSVParser csvParser;
+		{
+			File file = new File(this.path);
+			Date tmpLastModified = new Date(file.lastModified());
 
-		try {
-			Reader reader = Files.newBufferedReader(Paths.get(path));
-			csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrim());
-		} catch (IOException e) {
-			System.err.println("csv讀取失敗: " + e.toString());
-			return false;
+			// 節省效能避免每次都重新讀取檔案
+			// 檔案最後更新時間和目前暫存的不一樣就要重新讀取
+			boolean update = lastModified == null || !tmpLastModified.equals(lastModified);
+			update = update || this.records.isEmpty();
+
+			if (update) {
+				if (!this.records.isEmpty()) {
+					this.records.clear();
+				}
+
+				CSVParser csvParser = null;
+				try {
+					Reader reader = Files.newBufferedReader(Paths.get(this.path), StandardCharsets.UTF_8);
+					csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrim());
+					this.records.addAll(csvParser.getRecords());
+					csvParser.close();
+					System.out.println("重新讀取 csv, path: " + this.path);
+				} catch (IOException e) {
+					if (!this.records.isEmpty()) {
+						this.records.clear();
+					}
+					System.err.println("csv讀取失敗, path:" + csvParser + ", error:" + e.toString());
+					return false;
+				} finally {
+					if (csvParser != null && !csvParser.isClosed()) {
+						try {
+							csvParser.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+
+			this.lastModified = tmpLastModified;
 		}
 
 		boolean match = false; // 請求是否匹配
 
 		try {
-			for (CSVRecord csvRecord : csvParser) {
+			for (CSVRecord csvRecord : this.records) {
 				String reqStr = csvRecord.get(csvHeader[0]);
 				String delayStr = csvRecord.get(csvHeader[1]);
 				String methodStr = csvRecord.get(csvHeader[2]);
@@ -74,6 +119,9 @@ public class CsvUtil {
 					delay(delayStr);
 
 					match = true; // 請求匹配成功
+					
+					System.out.println("mapping row:" + (csvRecord.getRecordNumber() + 1) + ", method:" + methodStr
+							+ ", url:" + urlStr);
 					continue;
 				}
 
@@ -89,17 +137,9 @@ public class CsvUtil {
 					return true; // 請求匹配成功
 				}
 			}
-		} catch (
-
-		Exception e) {
+		} catch (Exception e) {
 			System.err.println("csv設定檔案錯誤: " + e.toString());
 			return false;
-		} finally {
-			try {
-				csvParser.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
 		}
 
 		return false; // 沒有匹配任何請求
@@ -352,5 +392,15 @@ public class CsvUtil {
 		} catch (InterruptedException ie) {
 			Thread.currentThread().interrupt();
 		}
+	}
+
+	public static boolean isCsvFile(File file) {
+		String filename = file.getName();
+		String extension = "";
+		int idx = filename.lastIndexOf(".");
+		if (idx >= 0) {
+			extension = filename.substring(idx + 1);
+		}
+		return extension.equals("csv");
 	}
 }
