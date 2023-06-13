@@ -1,46 +1,192 @@
 package com.lya79.mock.util;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.servlet.RequestDispatcher;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.lya79.mock.controller.MemberDao;
+import com.lya79.mock.controller.QueryResult;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
 @Component
 public class SqlUtil implements IMockUtil {
 
+	@Autowired
+	private MemberDao memberDao;
+
+	// 回傳給客戶端的內容格式
+	enum EFormatter {
+		JSON, XML
+	}
+
 	@Override
 	public boolean handler(HttpServletRequest request, HttpServletResponse response) {
+		String reqURLStr = (String) request.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
+		if (reqURLStr == null || reqURLStr.trim().equals("")) { // XXX 如果 api有定義在 controller裡面就會拿到 null
+			return false;
+		}
 
-		// input: 連線到一個資料庫
-		//
-		// 找出全部 table
-		// for loop 每一張 table{
-		//    找出每欄位名稱和型態
-		//    找出總共有多少筆紀錄
-		//    找出的資訊轉換成物件暫存起來
-		//	  備註: 儲存成物件後會暫存到類別變數, 下次在使用時會先檢查 table有沒有更新, 如果沒更新就使用暫存的就好, (參考 sql 1)
-		// }
-		// 
-		// output: 會得到一個 HashSet的物件集合存放每個 table的物件
-		
-		// input: HttpServletRequest 
-		// 找出 request的 method和 url
-		// 判斷客戶端要執行的行為(參考 restful api行為) 
-		// if 行為是 GET { // 代表要做資料查詢
-		//    使用url判斷查詢哪一張表
-		//    使用url和參數判斷要外帶入那些條件
-		//    執行sql語法得到n筆紀錄
-		//    將紀錄轉換成json
-		//    回傳json內容
-		// }else ...{
-		//    ...
-		// }
-		// 備註: api設計參考 51-69行的範例 API
-		
+		// 檢查 uri是否符合規則
+		Pattern pattern = Pattern.compile("^/[a-zA-Z0-9]+[/]{0,1}$");
+		Matcher matcher = pattern.matcher(reqURLStr);
+		if (!matcher.matches()) {
+			return false;
+		}
+
+		// 找出客戶端請求要訪問的 table
+		String tableName = reqURLStr.replace("/", "");
+		System.out.println("請求要訪問的 table: " + tableName);
+
+		// 檢查客戶端請求指定的 tableName是否存在
+		try {
+			if (!memberDao.isExistTableName(tableName)) {
+				System.out.println("無法匹配任何 table: " + tableName);
+				return false;
+			}
+		} catch (Exception e) {
+			System.err.println("外部請求錯誤或是sql執行錯誤: " + e.toString());
+			return false;
+		}
+
+		// TODO 要提供一個方法讓用戶知道有哪一些sql api可以操作, 例如: controller提供 api可以列出總共有哪些 api和 那些表
+
+		try {
+			String reqMethod = request.getMethod().toUpperCase();
+			switch (reqMethod) { // 判斷客戶端請求
+			case "GET": // 查詢
+				Map<String, String> parameterMap = getUrlParameter(request); // 取出 url參數, 選項
+				QueryResult queryResult = memberDao.query(tableName, parameterMap);
+
+				@Data
+				@AllArgsConstructor
+				class Response {
+					public List<Map<String, Object>> columnType; // 欄位型態, key:欄位名稱, value:型態
+					public List<Map<String, Object>> columnData; // 資料, key:欄位名稱, value:欄位值
+				}
+
+				Response resource = new Response(queryResult.getColumnInfo(), queryResult.getColumnData());
+				setResponseByQuery(response, resource, getFormatter(request));
+				return true; // content-type=application/json; charset=utf-8
+			case "POST": // 新增
+				// POST /{tableName} 欄位資料放在body內用json格式
+				break;
+			case "PUT": // 覆蓋資料
+				// PUT /{tableName}/ 欄位資料放在body內用json格式
+				break;
+			case "PATCH": // 更新部分
+				// PATCH /{tableName}/ 欄位資料放在body內用json格式
+				break;
+			case "DELETE": // 刪除
+				// DELETE /{tableName}
+				break;
+			default:
+				return false;
+			}
+		} catch (Exception e) {
+			System.err.println("外部請求錯誤或是sql執行錯誤: " + e.toString()); // TODO json回傳給客戶端
+			return false;
+		}
+
 		return false;
 	}
 
+	private EFormatter getFormatter(HttpServletRequest request) {
+//		application/xhtml+xml ：XHTML格式
+//		application/xml     ： XML数据格式
+//		application/atom+xml  ：Atom XML聚合格式
+//		application/json    ： JSON数据格式
+//		application/pdf       ：pdf格式
+		
+//		request.getContentType();
+		System.out.println("getContentType: "+request.getContentType());
+
+		return EFormatter.JSON;
+	}
+
+	private void setResponseByQuery(HttpServletResponse response, Object resource, EFormatter formatter)
+			throws IOException {
+		response.setStatus(200);
+
+		switch (formatter) {
+		case JSON:
+			response.setContentType("application/json");
+			response.setCharacterEncoding("UTF-8");
+
+			ObjectMapper objectMapper = new ObjectMapper();
+			ObjectNode jsonNodes = objectMapper.valueToTree(resource);
+			String jsonStr = objectMapper.writeValueAsString(jsonNodes);
+			response.setContentLength(jsonStr.length());
+
+			PrintWriter out = response.getWriter();
+			out.print(jsonStr);
+			out.flush();
+			break;
+		case XML: // TODO 輸出 xml
+
+			break;
+		default:
+			break;
+		}
+
+	}
+
+	private Map<String, String> getUrlParameter(HttpServletRequest request) {
+		Map<String, String> result = new HashMap<String, String>();
+
+		Map<String, String[]> reqMap = request.getParameterMap();
+		for (String key : reqMap.keySet()) {
+			result.put(key, reqMap.get(key)[0]);
+		}
+
+		return result;
+	}
 }
+
+//{
+//	  "columnType": [
+//	    {
+//	      "name": "name",
+//	      "type": "vchar"
+//	    },
+//	    {
+//	      "name": "deptid",
+//	      "type": "int"
+//	    },
+//	    {
+//	      "name": "salary",
+//	      "type": "int"
+//	    }
+//	  ],
+//	  "data": [
+//	    {
+//	      "name": "name",
+//	      "value": "hello2"
+//	    },
+//	    {
+//	      "name": "deptid",
+//	      "value": 20
+//	    },
+//	    {
+//	      "name": "salary",
+//	      "value": 2000
+//	    }
+//	  ]
+//	}
 
 // sql 1
 //查看資料表最後更新時間
@@ -97,4 +243,3 @@ public class SqlUtil implements IMockUtil {
 //410 Gone -[GET]：用户请求的资源被永久删除，且不会再得到的。
 //422 Unprocesable entity - [POST/PUT/PATCH] 当创建一个对象时，发生一个验证错误。
 //500 INTERNAL SERVER ERROR - [*]：服务器发生错误，用户将无法判断发出的请求是否成功。
-

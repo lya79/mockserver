@@ -2,6 +2,9 @@ package com.lya79.mock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -13,32 +16,18 @@ class MockApplicationTests {
 
 	@Test
 	void contextLoads() {
-		ObjectMapper mapper = new ObjectMapper();
+
+		Pattern pattern = Pattern.compile("^/[a-zA-Z0-9]+[/]{0,1}$"); // TODO 要測試看看
+
+		assert (!pattern.matcher("abc").matches());
+		assert (pattern.matcher("/abc").matches());
+		assert (!pattern.matcher("abc/").matches());
+		assert (pattern.matcher("/abc/").matches());
+		assert (!pattern.matcher("/abc//").matches());
+		assert (!pattern.matcher("/abc/abc").matches());
+		assert (!pattern.matcher("/abc/abc/").matches());
 		
-		String s1 = "{\n"
-				+ "    \"employee\":\n"
-				+ "    {\n"
-				+ "        \"id\": \"1212\",\n"
-				+ "        \"fullName\": \"John Miles\",\n"
-				+ "        \"age\": 34\n"
-				+ "    }\n"
-				+ "}";
-		
-		String s2 = "{   \n"    
-				+ "    \"employee\":   \n"
-				+ "    {\n"
-				+ "        \"id\"     : \"1212\",\n"
-				+ "        \"age\": 34,\n"
-				+ "        \"fullName\": \"John Miles\"\n"
-				+ "    }\n"
-				+ "}";
-		
-		try {
-			assertEquals(mapper.readTree(s1), mapper.readTree(s2));
-		} catch (JsonProcessingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		assert (pattern.matcher("abc").matches());
 	}
 
 }

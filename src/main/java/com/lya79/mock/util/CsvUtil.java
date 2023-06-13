@@ -119,7 +119,7 @@ public class CsvUtil implements IMockUtil {
 					delay(delayStr);
 
 					match = true; // 請求匹配成功
-					
+
 					System.out.println("mapping row:" + (csvRecord.getRecordNumber() + 1) + ", method:" + methodStr
 							+ ", url:" + urlStr);
 					continue;
@@ -227,6 +227,10 @@ public class CsvUtil implements IMockUtil {
 		}
 
 		String reqURLStr = (String) request.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
+		if (reqURLStr == null || reqURLStr.trim().equals("")) { // XXX 如果 api有定義在 controller裡面就會拿到 null
+			return false;
+		}
+
 		Pattern pattern = Pattern.compile(text.trim());
 		Matcher matcher = pattern.matcher(reqURLStr);
 
@@ -382,6 +386,10 @@ public class CsvUtil implements IMockUtil {
 	}
 
 	private void delay(String text) throws NumberFormatException {
+		if (text == null || text.trim().equals("")) {
+			return;
+		}
+
 		int sleep = Integer.parseInt(text);
 		if (sleep <= 0) {
 			return;
