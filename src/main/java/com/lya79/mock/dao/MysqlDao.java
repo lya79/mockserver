@@ -131,20 +131,28 @@ public class MysqlDao {
 
 		ArrayList<String> columnNameList = new ArrayList<>();
 		ArrayList<Object> columnValList = new ArrayList<>();
+		ArrayList<Boolean> autoIncrementList = new ArrayList<>();
 
 		// 比對客戶端帶來的參數名稱和型態是否符合 table內的欄位
 		for (Map<String, Object> map : columnInfo) {
 			String columnName = (String) map.get("COLUMN_NAME");
 			EDataType dataType = getDataType((String) map.get("DATA_TYPE"));
+			String extra = (String) map.get("EXTRA");
 
 			Object val = parameterMap.get(columnName);
 			if (val == null) {
+				if (extra.equalsIgnoreCase("auto_increment")) {
+					continue;
+				}
 				logger.info("請求參數錯誤, 缺少欄位:" + columnName);
 				return false;
 			}
 
 			columnNameList.add(columnName);
 			columnValList.add(val);
+			autoIncrementList.add(extra.equalsIgnoreCase("auto_increment"));
+
+			logger.info(columnName + ", " + extra);
 
 			switch (dataType) {
 			case INT:
@@ -165,8 +173,14 @@ public class MysqlDao {
 		sb.append(" (");
 		{
 			int count = columnNameList.size();
-			for (String columnName : columnNameList) {
+			for (int i = 0; i < columnNameList.size(); i++) {
+				String columnName = columnNameList.get(i);
+
 				count -= 1;
+
+				if (autoIncrementList.get(i)) {
+					continue;
+				}
 
 				sb.append(" ").append(columnName);
 
@@ -180,8 +194,14 @@ public class MysqlDao {
 		sb.append(" (");
 		{
 			int count = columnValList.size();
-			for (Object columnVal : columnValList) {
+			for (int i = 0; i < columnValList.size(); i++) {
+				Object columnVal = columnValList.get(i);
+
 				count -= 1;
+
+				if (autoIncrementList.get(i)) {
+					continue;
+				}
 
 				if (columnVal instanceof Integer) {
 					sb.append(" ").append((Integer) columnVal);
