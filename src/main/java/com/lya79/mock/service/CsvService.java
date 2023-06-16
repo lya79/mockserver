@@ -1,4 +1,4 @@
-package com.lya79.mock.util;
+package com.lya79.mock.service;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,6 +25,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -33,7 +35,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Setter;
 
 @Component
-public class CsvUtil implements IMockUtil {
+public class CsvService implements IMockService {
+	private final static Logger logger = LoggerFactory.getLogger(CsvService.class);
+
 	@Setter
 	private String path;
 
@@ -45,12 +49,12 @@ public class CsvUtil implements IMockUtil {
 		String[] csvHeader = new String[] { "type", "delay", "method", "url", "status", "header", "parameter", "body",
 				"cookie", "cookie-expires" };
 
+		// 節省效能避免每次都重新讀取檔案
+		// 檔案最後更新時間和目前暫存的不一樣就要重新讀取
 		{
 			File file = new File(this.path);
 			Date tmpLastModified = new Date(file.lastModified());
 
-			// 節省效能避免每次都重新讀取檔案
-			// 檔案最後更新時間和目前暫存的不一樣就要重新讀取
 			boolean update = lastModified == null || !tmpLastModified.equals(lastModified);
 			update = update || this.records.isEmpty();
 
@@ -65,12 +69,12 @@ public class CsvUtil implements IMockUtil {
 					csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrim());
 					this.records.addAll(csvParser.getRecords());
 					csvParser.close();
-					System.out.println("重新讀取 csv, path: " + this.path);
+					logger.info("重新讀取 csv, path: " + this.path);
 				} catch (IOException e) {
 					if (!this.records.isEmpty()) {
 						this.records.clear();
 					}
-					System.err.println("csv讀取失敗, path:" + csvParser + ", error:" + e.toString());
+					logger.warn("csv讀取失敗, path:" + csvParser + ", error:" + e.toString());
 					return false;
 				} finally {
 					if (csvParser != null && !csvParser.isClosed()) {
@@ -120,8 +124,8 @@ public class CsvUtil implements IMockUtil {
 
 					match = true; // 請求匹配成功
 
-					System.out.println("mapping row:" + (csvRecord.getRecordNumber() + 1) + ", method:" + methodStr
-							+ ", url:" + urlStr);
+					logger.info("mapping row:" + (csvRecord.getRecordNumber() + 1) + ", method:" + methodStr + ", url:"
+							+ urlStr);
 					continue;
 				}
 
@@ -138,7 +142,7 @@ public class CsvUtil implements IMockUtil {
 				}
 			}
 		} catch (Exception e) {
-			System.err.println("csv設定檔案錯誤: " + e.toString());
+			logger.warn("csv設定檔案錯誤: " + e.toString());
 			return false;
 		}
 
@@ -159,6 +163,7 @@ public class CsvUtil implements IMockUtil {
 		for (int i = 0; i < arr.length; i++) {
 			String[] arr2 = arr[i].split("=", 2);
 			if (arr2.length != 2) {
+				logger.warn("設定header, parameter參數錯誤: " + text);
 				throw new Exception("設定header, parameter參數錯誤: " + text);
 			}
 
@@ -192,6 +197,7 @@ public class CsvUtil implements IMockUtil {
 		for (int i = 0; i < arr.length; i++) {
 			String[] arr2 = arr[i].split("=", 2);
 			if (arr2.length != 2) {
+				logger.warn("檢查cookie, 參數錯誤: " + text);
 				throw new Exception("檢查cookie, 參數錯誤: " + text);
 			}
 
@@ -214,6 +220,7 @@ public class CsvUtil implements IMockUtil {
 
 	private boolean isMatchMethod(HttpServletRequest request, String text) throws Exception {
 		if (text == null || text.trim().equals("")) {
+			logger.warn("檢查method, 參數錯誤: " + text);
 			throw new Exception("檢查method, 參數錯誤: " + text);
 		}
 
@@ -223,6 +230,7 @@ public class CsvUtil implements IMockUtil {
 
 	private boolean isMatchURL(HttpServletRequest request, String text) throws Exception {
 		if (text == null || text.trim().equals("")) {
+			logger.warn("檢查method, 參數錯誤: " + text);
 			throw new Exception("檢查url, 參數錯誤: " + text);
 		}
 
@@ -247,6 +255,7 @@ public class CsvUtil implements IMockUtil {
 		for (int i = 0; i < arr.length; i++) {
 			String[] arr2 = arr[i].split("=", 2);
 			if (arr2.length != 2) {
+				logger.warn("檢查header, parameter參數錯誤: " + text);
 				throw new Exception("檢查header, parameter參數錯誤: " + text);
 			}
 
@@ -290,6 +299,7 @@ public class CsvUtil implements IMockUtil {
 		for (int i = 0; i < arr.length; i++) {
 			String[] arr2 = arr[i].split("=", 2);
 			if (arr2.length != 2) {
+				logger.warn("檢查url, parameter參數錯誤: " + text);
 				throw new Exception("檢查url, parameter參數錯誤: " + text);
 			}
 
@@ -348,6 +358,7 @@ public class CsvUtil implements IMockUtil {
 		for (int i = 0; i < arr.length; i++) {
 			String[] arr2 = arr[i].split("=", 2);
 			if (arr2.length != 2) {
+				logger.warn("檢查cookie, 參數錯誤: " + text);
 				throw new Exception("檢查cookie, 參數錯誤: " + text);
 			}
 

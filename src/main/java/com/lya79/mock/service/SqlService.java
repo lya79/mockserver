@@ -1,37 +1,43 @@
-package com.lya79.mock.util;
+package com.lya79.mock.service;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.lya79.mock.controller.MemberDao;
-import com.lya79.mock.controller.QueryResult;
+import com.lya79.mock.dao.MysqlDao;
+import com.lya79.mock.model.GlobalErrorResponse;
+import com.lya79.mock.model.GlobalResponse;
+import com.lya79.mock.model.Result;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+//TODO 要提供一個方法讓用戶知道有哪一些sql api可以操作, 例如: controller提供 api可以列出總共有哪些 api和 那些表
 
 @Component
-public class SqlUtil implements IMockUtil {
+public class SqlService implements IMockService {
+	private final static Logger logger = LoggerFactory.getLogger(SqlService.class);
 
 	@Autowired
-	private MemberDao memberDao;
+	private MysqlDao mysqlDao;
 
 	// 回傳給客戶端的內容格式
-	enum EFormatter {
-		JSON, XML
+	private enum EFormatter {
+		JSON
 	}
 
 	@Override
@@ -50,40 +56,38 @@ public class SqlUtil implements IMockUtil {
 
 		// 找出客戶端請求要訪問的 table
 		String tableName = reqURLStr.replace("/", "");
-		System.out.println("請求要訪問的 table: " + tableName);
+		logger.info("請求要訪問的 table: " + tableName);
 
 		// 檢查客戶端請求指定的 tableName是否存在
 		try {
-			if (!memberDao.isExistTableName(tableName)) {
-				System.out.println("無法匹配任何 table: " + tableName);
+			if (!mysqlDao.isExistTableName(tableName)) {
+				logger.info("無法匹配任何 table: " + tableName);
 				return false;
 			}
 		} catch (Exception e) {
-			System.err.println("外部請求錯誤或是sql執行錯誤: " + e.toString());
+			logger.warn("檢查 table錯誤: " + e.toString());
 			return false;
 		}
 
-		// TODO 要提供一個方法讓用戶知道有哪一些sql api可以操作, 例如: controller提供 api可以列出總共有哪些 api和 那些表
-
 		try {
+			Result result = null;
+			GlobalResponse resp = null;
+			Exception ex = null;
+
 			String reqMethod = request.getMethod().toUpperCase();
 			switch (reqMethod) { // 判斷客戶端請求
 			case "GET": // 查詢
-				Map<String, String> parameterMap = getUrlParameter(request); // 取出 url參數, 選項
-				QueryResult queryResult = memberDao.query(tableName, parameterMap);
-
-				@Data
-				@AllArgsConstructor
-				class Response {
-					public List<Map<String, Object>> columnType; // 欄位型態, key:欄位名稱, value:型態
-					public List<Map<String, Object>> columnData; // 資料, key:欄位名稱, value:欄位值
-				}
-
-				Response resource = new Response(queryResult.getColumnInfo(), queryResult.getColumnData());
-				setResponseByQuery(response, resource, getFormatter(request));
-				return true; // content-type=application/json; charset=utf-8
+				result = mysqlDao.query(tableName, getUrlParameter(request));
+				break;
 			case "POST": // 新增
-				// POST /{tableName} 欄位資料放在body內用json格式
+				Map<String, Object> map = getBodyParameter(request);
+				boolean ok = mysqlDao.create(tableName, map);
+				if (!ok) {
+					ex = new Exception("db寫入失敗");
+					logger.info("db寫入失敗");
+				} else {
+					result = mysqlDao.query(tableName, map);
+				}
 				break;
 			case "PUT": // 覆蓋資料
 				// PUT /{tableName}/ 欄位資料放在body內用json格式
@@ -97,30 +101,28 @@ public class SqlUtil implements IMockUtil {
 			default:
 				return false;
 			}
+
+			if (ex == null) {
+				resp = new GlobalResponse(result.getColumnInfo(), result.getColumnData());
+			}
+
+			setResponse(response, resp, getFormatter(request), ex);
+
+			return true;
 		} catch (Exception e) {
-			System.err.println("外部請求錯誤或是sql執行錯誤: " + e.toString()); // TODO json回傳給客戶端
+			logger.warn("外部請求錯誤或是sql執行錯誤: " + e.toString()); // TODO json回傳給客戶端
 			return false;
 		}
-
-		return false;
 	}
 
-	private EFormatter getFormatter(HttpServletRequest request) {
-//		application/xhtml+xml ：XHTML格式
-//		application/xml     ： XML数据格式
-//		application/atom+xml  ：Atom XML聚合格式
-//		application/json    ： JSON数据格式
-//		application/pdf       ：pdf格式
-		
-//		request.getContentType();
-		System.out.println("getContentType: "+request.getContentType());
-
+	private EFormatter getFormatter(HttpServletRequest request) { // XXX 目前先只有提供 json格式回傳
 		return EFormatter.JSON;
 	}
 
-	private void setResponseByQuery(HttpServletResponse response, Object resource, EFormatter formatter)
+	private void setResponse(HttpServletResponse response, Object resource, EFormatter formatter, Exception ex)
 			throws IOException {
-		response.setStatus(200);
+
+		response.setStatus(ex == null ? 200 : 400);
 
 		switch (formatter) {
 		case JSON:
@@ -128,15 +130,19 @@ public class SqlUtil implements IMockUtil {
 			response.setCharacterEncoding("UTF-8");
 
 			ObjectMapper objectMapper = new ObjectMapper();
-			ObjectNode jsonNodes = objectMapper.valueToTree(resource);
-			String jsonStr = objectMapper.writeValueAsString(jsonNodes);
-			response.setContentLength(jsonStr.length());
+
+			String jsonStr;
+			if (ex == null) {
+				ObjectNode jsonNodes = objectMapper.valueToTree(resource);
+				jsonStr = objectMapper.writeValueAsString(jsonNodes);
+				response.setContentLength(jsonStr.length());
+			} else {
+				jsonStr = "{ \"error:\":\"DB寫入失敗\"}";
+			}
 
 			PrintWriter out = response.getWriter();
 			out.print(jsonStr);
 			out.flush();
-			break;
-		case XML: // TODO 輸出 xml
 
 			break;
 		default:
@@ -145,8 +151,8 @@ public class SqlUtil implements IMockUtil {
 
 	}
 
-	private Map<String, String> getUrlParameter(HttpServletRequest request) {
-		Map<String, String> result = new HashMap<String, String>();
+	private Map<String, Object> getUrlParameter(HttpServletRequest request) {
+		Map<String, Object> result = new HashMap<>();
 
 		Map<String, String[]> reqMap = request.getParameterMap();
 		for (String key : reqMap.keySet()) {
@@ -155,38 +161,31 @@ public class SqlUtil implements IMockUtil {
 
 		return result;
 	}
-}
 
-//{
-//	  "columnType": [
-//	    {
-//	      "name": "name",
-//	      "type": "vchar"
-//	    },
-//	    {
-//	      "name": "deptid",
-//	      "type": "int"
-//	    },
-//	    {
-//	      "name": "salary",
-//	      "type": "int"
-//	    }
-//	  ],
-//	  "data": [
-//	    {
-//	      "name": "name",
-//	      "value": "hello2"
-//	    },
-//	    {
-//	      "name": "deptid",
-//	      "value": 20
-//	    },
-//	    {
-//	      "name": "salary",
-//	      "value": 2000
-//	    }
-//	  ]
-//	}
+	private Map<String, Object> getBodyParameter(HttpServletRequest request) throws IOException {
+		Map<String, Object> result = new HashMap<>();
+
+		String applicationJson = request.getReader().lines().collect(Collectors.joining());
+		JsonNode reqApplicationJsonNode = new ObjectMapper().readTree(applicationJson);
+
+		Iterator<Map.Entry<String, JsonNode>> jsonNodes = reqApplicationJsonNode.fields();
+		while (jsonNodes.hasNext()) {
+			Map.Entry<String, JsonNode> node = jsonNodes.next();
+			String key = node.getKey().toString();
+			Object val;
+			if (node.getValue().isTextual()) {
+				val = node.getValue().textValue();
+			} else if (node.getValue().isDouble()) {
+				val = node.getValue().asDouble();
+			} else {
+				val = node.getValue().asInt();
+			}
+			result.put(key, val);
+		}
+
+		return result;
+	}
+}
 
 // sql 1
 //查看資料表最後更新時間
