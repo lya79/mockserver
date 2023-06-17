@@ -116,7 +116,7 @@ public class SqlService implements IMockService {
 
 			return true;
 		} catch (Exception e) {
-			logger.warn("外部請求錯誤或是sql執行錯誤: " + e.toString()); // TODO json回傳給客戶端
+			logger.warn("外部請求錯誤或是sql執行錯誤: " + e.toString());
 			return false;
 		}
 	}
