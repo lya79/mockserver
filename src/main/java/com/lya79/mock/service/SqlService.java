@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.lya79.mock.dao.MysqlDao;
-import com.lya79.mock.model.GlobalErrorResponse;
 import com.lya79.mock.model.GlobalResponse;
 import com.lya79.mock.model.Result;
 
@@ -73,37 +72,44 @@ public class SqlService implements IMockService {
 			Result result = null;
 			GlobalResponse resp = null;
 			Exception ex = null;
+			Map<String, Object> map = null;
 
 			String reqMethod = request.getMethod().toUpperCase();
 			switch (reqMethod) { // 判斷客戶端請求
 			case "GET": // 查詢
-				result = mysqlDao.query(tableName, getUrlParameter(request));
+				map = getUrlParameter(request);
 				break;
 			case "POST": // 新增
-				Map<String, Object> map = getBodyParameter(request);
-				boolean ok = mysqlDao.create(tableName, map);
-				if (!ok) {
+				map = getBodyParameter(request);
+				if (!mysqlDao.create(tableName, map)) {
 					ex = new Exception("db寫入失敗");
-					logger.info("db寫入失敗");
-				} else {
-					result = mysqlDao.query(tableName, map);
 				}
 				break;
 			case "PUT": // 覆蓋資料
-				// PUT /{tableName}/ 欄位資料放在body內用json格式
-				break;
 			case "PATCH": // 更新部分
-				// PATCH /{tableName}/ 欄位資料放在body內用json格式
+				map = getBodyParameter(request);
+				if (!mysqlDao.update(tableName, getUrlParameter(request), map, (reqMethod.equals("PUT")))) {// PUT情況要要求客戶端帶入完整欄位資料(POST情況)
+					ex = new Exception("db更新失敗");
+				}
 				break;
 			case "DELETE": // 刪除
-				// DELETE /{tableName}
+				map = getUrlParameter(request);
+				result = mysqlDao.query(tableName, map); // 刪除前先暫存
+				if (!mysqlDao.delete(tableName, map)) {
+					ex = new Exception("db刪除失敗");
+				}
 				break;
 			default:
 				return false;
 			}
 
 			if (ex == null) {
+				if (result == null) {
+					result = mysqlDao.query(tableName, map);
+				}
 				resp = new GlobalResponse(result.getColumnInfo(), result.getColumnData());
+			} else {
+				logger.info(ex.toString());
 			}
 
 			setResponse(response, resp, getFormatter(request), ex);
@@ -137,7 +143,7 @@ public class SqlService implements IMockService {
 				jsonStr = objectMapper.writeValueAsString(jsonNodes);
 				response.setContentLength(jsonStr.length());
 			} else {
-				jsonStr = "{ \"error:\":\"DB寫入失敗\"}";
+				jsonStr = "{ \"error:\":\"DB操作失敗\"}";
 			}
 
 			PrintWriter out = response.getWriter();

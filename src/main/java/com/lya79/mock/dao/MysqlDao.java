@@ -27,6 +27,62 @@ public class MysqlDao {
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
 
+	enum EDataType {
+		STRING, INT, DOUBLE
+	}
+
+	public boolean delete(String tableName, Map<String, Object> parameterMap) throws Exception {
+		List<Map<String, Object>> columnInfo = getColumnInfo(tableName);
+		Map<String, EDataType> dataTypeMap = new HashMap<>();
+
+		// 比對客戶端帶來的參數名稱和型態是否符合 table內的欄位
+		for (Map<String, Object> map : columnInfo) {
+			String columnName = (String) map.get("COLUMN_NAME");
+			EDataType dataType = getDataType((String) map.get("DATA_TYPE"));
+			dataTypeMap.put(columnName, dataType);
+		}
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("delete from ").append(tableName);
+
+		int count = parameterMap.size();
+		sb.append(" where");
+		for (Map.Entry<String, Object> entry : parameterMap.entrySet()) {
+			String key = entry.getKey();
+			Object val = entry.getValue();
+
+			sb.append(" ").append(key).append("=");
+			if (dataTypeMap.get(key) == EDataType.STRING) {
+				sb.append("'").append(val).append("'");
+			} else {
+				sb.append(val);
+			}
+
+			count -= 1;
+			if (count > 0) {
+				sb.append(" and ");
+			}
+		}
+
+		String sql = sb.toString();
+		logger.info("執行SQL: " + sql);
+
+		try {
+			if (jdbcTemplate.update(sql) <= 0) {
+				logger.info("寫入table失敗, sql:" + sql);
+				return false;
+			}
+		} catch (DuplicateKeyException e) {
+			logger.info("寫入table失敗, 主鍵重複, sql:" + sql);
+			return false;
+		} catch (Exception e) {
+			logger.info("寫入table失敗, sql:" + sql + ", e:" + e.toString());
+			return false;
+		}
+
+		return true;
+	}
+
 	public Result query(String tableName, Map<String, Object> parameterMap) throws Exception {
 		List<Map<String, Object>> columnInfo = getColumnInfo(tableName);
 
@@ -97,33 +153,76 @@ public class MysqlDao {
 		return new Result(columnInfo, columnData);
 	}
 
-	private EDataType getDataType(String dataType) {
-		if (dataType.equalsIgnoreCase("TINYINT") || dataType.equalsIgnoreCase("SMALLINT")
-				|| dataType.equalsIgnoreCase("MEDIUMINT") || dataType.equalsIgnoreCase("INT")
-				|| dataType.equalsIgnoreCase("INTEGER") || dataType.equalsIgnoreCase("BIGINT")
-				|| dataType.equalsIgnoreCase("FLOAT") || dataType.equalsIgnoreCase("DOUBLE")
-				|| dataType.equalsIgnoreCase("DECIMAL")) {
-			return EDataType.INT;
+	public boolean update(String tableName, Map<String, Object> urlParameterMap, Map<String, Object> bodyParameterMap,
+			boolean putMethod) throws Exception {
+		List<Map<String, Object>> columnInfo = getColumnInfo(tableName);
+		Map<String, EDataType> dataTypeMap = new HashMap<>();
+
+		// 比對客戶端帶來的參數名稱和型態是否符合 table內的欄位
+		for (Map<String, Object> map : columnInfo) {
+			String columnName = (String) map.get("COLUMN_NAME");
+			EDataType dataType = getDataType((String) map.get("DATA_TYPE"));
+			dataTypeMap.put(columnName, dataType);
 		}
 
-		if (dataType.equalsIgnoreCase("FLOAT") || dataType.equalsIgnoreCase("DOUBLE")
-				|| dataType.equalsIgnoreCase("DECIMAL")) {
-			return EDataType.DOUBLE;
+		StringBuilder sb = new StringBuilder();
+		sb.append("update ").append(tableName);
+
+		int count = bodyParameterMap.size();
+		sb.append(" set");
+		for (Map.Entry<String, Object> entry : bodyParameterMap.entrySet()) {
+			String key = entry.getKey();
+			Object val = entry.getValue();
+
+			sb.append(" ").append(key).append("=");
+			if (dataTypeMap.get(key) == EDataType.STRING) {
+				sb.append("'").append(val).append("'");
+			} else {
+				sb.append(val);
+			}
+
+			count -= 1;
+			if (count > 0) {
+				sb.append(", ");
+			}
 		}
 
-		if (dataType.equalsIgnoreCase("CHAR") || dataType.equalsIgnoreCase("VARCHAR")
-				|| dataType.equalsIgnoreCase("TINYBLOB") || dataType.equalsIgnoreCase("TINYTEXT")
-				|| dataType.equalsIgnoreCase("BLOB") || dataType.equalsIgnoreCase("TEXT")
-				|| dataType.equalsIgnoreCase("MEDIUMBLOB") || dataType.equalsIgnoreCase("MEDIUMTEXT")
-				|| dataType.equalsIgnoreCase("LONGBLOB") || dataType.equalsIgnoreCase("LONGTEXT")) {
-			return EDataType.STRING;
+		count = urlParameterMap.size();
+		sb.append(" where");
+		for (Map.Entry<String, Object> entry : urlParameterMap.entrySet()) {
+			String key = entry.getKey();
+			Object val = entry.getValue();
+
+			sb.append(" ").append(key).append("=");
+			if (dataTypeMap.get(key) == EDataType.STRING) {
+				sb.append("'").append(val).append("'");
+			} else {
+				sb.append(val);
+			}
+
+			count -= 1;
+			if (count > 0) {
+				sb.append(" and ");
+			}
 		}
 
-		return EDataType.STRING; // XXX 先暫時設定成字串
-	}
+		String sql = sb.toString();
+		logger.info("執行SQL: " + sql);
 
-	enum EDataType {
-		STRING, INT, DOUBLE
+		try {
+			if (jdbcTemplate.update(sql) <= 0) {
+				logger.info("寫入table失敗, sql:" + sql);
+				return false;
+			}
+		} catch (DuplicateKeyException e) {
+			logger.info("寫入table失敗, 主鍵重複, sql:" + sql);
+			return false;
+		} catch (Exception e) {
+			logger.info("寫入table失敗, sql:" + sql + ", e:" + e.toString());
+			return false;
+		}
+
+		return true;
 	}
 
 	public boolean create(String tableName, Map<String, Object> parameterMap) throws Exception {
@@ -248,6 +347,31 @@ public class MysqlDao {
 		List<Map<String, Object>> columnInfo = jdbcTemplate.queryForList(sql);
 
 		return columnInfo;
+	}
+
+	private EDataType getDataType(String dataType) {
+		if (dataType.equalsIgnoreCase("TINYINT") || dataType.equalsIgnoreCase("SMALLINT")
+				|| dataType.equalsIgnoreCase("MEDIUMINT") || dataType.equalsIgnoreCase("INT")
+				|| dataType.equalsIgnoreCase("INTEGER") || dataType.equalsIgnoreCase("BIGINT")
+				|| dataType.equalsIgnoreCase("FLOAT") || dataType.equalsIgnoreCase("DOUBLE")
+				|| dataType.equalsIgnoreCase("DECIMAL")) {
+			return EDataType.INT;
+		}
+
+		if (dataType.equalsIgnoreCase("FLOAT") || dataType.equalsIgnoreCase("DOUBLE")
+				|| dataType.equalsIgnoreCase("DECIMAL")) {
+			return EDataType.DOUBLE;
+		}
+
+		if (dataType.equalsIgnoreCase("CHAR") || dataType.equalsIgnoreCase("VARCHAR")
+				|| dataType.equalsIgnoreCase("TINYBLOB") || dataType.equalsIgnoreCase("TINYTEXT")
+				|| dataType.equalsIgnoreCase("BLOB") || dataType.equalsIgnoreCase("TEXT")
+				|| dataType.equalsIgnoreCase("MEDIUMBLOB") || dataType.equalsIgnoreCase("MEDIUMTEXT")
+				|| dataType.equalsIgnoreCase("LONGBLOB") || dataType.equalsIgnoreCase("LONGTEXT")) {
+			return EDataType.STRING;
+		}
+
+		return EDataType.STRING; // XXX 先暫時設定成字串
 	}
 
 	private Map<String, String> getColumnTypeByColumnInfo(List<Map<String, Object>> columnInfo) {
